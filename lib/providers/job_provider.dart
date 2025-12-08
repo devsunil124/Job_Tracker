@@ -1,0 +1,74 @@
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
+import '../models/job.dart';
+import '../services/storage_service.dart';
+import '../services/resume_service.dart';
+
+class JobProvider with ChangeNotifier {
+  final StorageService _storageService = StorageService();
+  final ResumeService _resumeService = ResumeService();
+
+  List<Job> _jobs = [];
+  bool _isLoading = false;
+
+  List<Job> get jobs => _jobs;
+  bool get isLoading => _isLoading;
+
+  // Filtered lists
+  List<Job> get appliedJobs =>
+      _jobs.where((j) => j.status != 'Wishlist').toList();
+  List<Job> get wishlistJobs =>
+      _jobs.where((j) => j.status == 'Wishlist').toList();
+
+  // Analytics getters
+  int get totalApplications => appliedJobs.length;
+  int get rejectedCount =>
+      appliedJobs.where((j) => j.status == 'Rejected').length;
+  int get noResponseCount =>
+      appliedJobs.where((j) => j.status == 'No Response').length;
+  int get activeCount => totalApplications - rejectedCount - noResponseCount;
+
+  JobProvider() {
+    loadJobs();
+  }
+
+  Future<void> loadJobs() async {
+    _isLoading = true;
+    notifyListeners();
+    _jobs = await _storageService.loadJobs();
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> addJob(Job job) async {
+    _jobs.add(job);
+    await _storageService.saveJobs(_jobs);
+    notifyListeners();
+  }
+
+  Future<void> updateJobStatus(String id, String newStatus) async {
+    final index = _jobs.indexWhere((j) => j.id == id);
+    if (index != -1) {
+      _jobs[index].status = newStatus;
+      await _storageService.saveJobs(_jobs);
+      notifyListeners();
+    }
+  }
+
+  Future<String?> uploadResume(String jobId) async {
+    return await _resumeService.pickAndSaveResume(jobId);
+  }
+
+  Future<Uint8List?> getResumeBytes(String jobId, String path) async {
+    return await _resumeService.getResumeBytes(jobId, path);
+  }
+
+  Future<void> addToWishlist(Job job) async {
+    job.status = 'Wishlist';
+    await addJob(job);
+  }
+
+  Future<void> moveToApplied(String id) async {
+    await updateJobStatus(id, 'Applied');
+  }
+}

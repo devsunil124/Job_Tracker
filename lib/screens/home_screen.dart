@@ -1,9 +1,12 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
+
+import 'dart:ui'; // For verifying glassmorphism if needed
 import '../providers/job_provider.dart';
 import '../models/job.dart';
+import 'add_job_screen.dart';
+import 'job_details_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -11,13 +14,25 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[50], // Light elegant background
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const AddJobScreen()),
+          );
+        },
+        label: const Text('Add Job'),
+        icon: const Icon(Icons.add),
+        backgroundColor: Colors.black87,
+        foregroundColor: Colors.white,
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
           child: Consumer<JobProvider>(
             builder: (context, jobProvider, child) {
-              final jobs =
-                  jobProvider.appliedJobs; // Exclude wishlist for main stats
+              final jobs = jobProvider.appliedJobs;
 
               if (jobProvider.isLoading) {
                 return const Center(child: CircularProgressIndicator());
@@ -27,50 +42,56 @@ class HomeScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  // Greeting
-                  Text(
-                    'Hi Sunil',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).primaryColor,
-                    ),
-                  ),
-                  Text(
-                    'Here is your job search progress',
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 24),
+                  // Header / Greeting
+                  _buildHeader(context),
+                  const SizedBox(height: 30),
 
                   // Quick Stats Row
                   _buildQuickStats(context, jobs),
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // Pie Chart
+                  // Pie Chart Section
                   if (jobs.isNotEmpty) ...[
                     Text(
-                      'Application Status',
+                      'Applications Overview',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(height: 200, child: _buildPieChart(jobs)),
+                    const SizedBox(height: 20),
+                    Container(
+                      height: 240,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 16,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(20),
+                      child: _buildDonutChart(jobs, context),
+                    ),
                   ],
 
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
                   // Recent Activity
                   Text(
                     'Recent Applications',
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
+                      color: Colors.black87,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  _buildRecentActivity(jobs),
+                  const SizedBox(height: 16),
+                  _buildRecentActivity(jobs, context),
+                  const SizedBox(height: 60), // Space for FAB
                 ],
               );
             },
@@ -80,38 +101,105 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hi Sunil,',
+              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF1A1A1A),
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Good luck with your job hunt!',
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Colors.grey[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1), // Subtle accent
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            Icons.person_outline_rounded,
+            color: Colors.blue,
+            size: 28,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildQuickStats(BuildContext context, List<Job> jobs) {
     final total = jobs.length;
     final interviews = jobs.where((j) => j.status == 'Interview').length;
     final offers = jobs.where((j) => j.status == 'Offer').length;
+    final rejected = jobs.where((j) => j.status == 'Rejected').length;
 
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _buildStatCard(
-            context,
-            'Applied',
-            total.toString(),
-            Colors.blue,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                context,
+                'Applied',
+                total.toString(),
+                Icons.send_rounded,
+                Colors.blue,
+                Colors.blue.shade50,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildStatCard(
+                context,
+                'Interviews',
+                interviews.toString(),
+                Icons.people_alt_rounded,
+                Colors.orange,
+                Colors.orange.shade50,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            'Interviews',
-            interviews.toString(),
-            Colors.orange,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _buildStatCard(
-            context,
-            'Offers',
-            offers.toString(),
-            Colors.green,
-          ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                context,
+                'Offers',
+                offers.toString(),
+                Icons.celebration_rounded,
+                Colors.green,
+                Colors.green.shade50,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: _buildStatCard(
+                context,
+                'Rejected',
+                rejected.toString(),
+                Icons.cancel_outlined,
+                Colors.red,
+                Colors.red.shade50,
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -121,30 +209,47 @@ class HomeScreen extends StatelessWidget {
     BuildContext context,
     String title,
     String value,
+    IconData icon,
     Color color,
+    Color bgColor,
   ) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 16),
           Text(
             value,
             style: Theme.of(context).textTheme.headlineSmall?.copyWith(
               fontWeight: FontWeight.bold,
-              color: color,
+              color: Colors.black87,
             ),
           ),
           const SizedBox(height: 4),
           Text(
             title,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: color.withValues(alpha: 0.8),
+              color: Colors.grey[600],
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -153,8 +258,7 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildPieChart(List<Job> jobs) {
-    // Calculate distribution
+  Widget _buildDonutChart(List<Job> jobs, BuildContext context) {
     final statusCounts = <String, int>{};
     for (var job in jobs) {
       statusCounts[job.status] = (statusCounts[job.status] ?? 0) + 1;
@@ -166,9 +270,9 @@ class HomeScreen extends StatelessWidget {
         color: color,
         value: entry.value.toDouble(),
         title: '${entry.value}',
-        radius: 50,
+        radius: 25, // Thinner ring
         titleStyle: const TextStyle(
-          fontSize: 16,
+          fontSize: 14,
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
@@ -178,15 +282,44 @@ class HomeScreen extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: PieChart(
-            PieChartData(
-              sections: sections,
-              centerSpaceRadius: 40,
-              sectionsSpace: 2,
-            ),
+          flex: 3,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              PieChart(
+                PieChartData(
+                  sections: sections,
+                  centerSpaceRadius: 50,
+                  sectionsSpace: 4,
+                  startDegreeOffset: -90,
+                ),
+              ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    jobs.length.toString(),
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  Text(
+                    'Total',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
-        _buildLegend(statusCounts),
+        const SizedBox(width: 24),
+        Expanded(flex: 2, child: _buildLegend(statusCounts)),
       ],
     );
   }
@@ -197,19 +330,29 @@ class HomeScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: statusCounts.keys.map((status) {
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             children: [
               Container(
-                width: 12,
-                height: 12,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(
                   color: _getStatusColor(status),
                   shape: BoxShape.circle,
                 ),
               ),
               const SizedBox(width: 8),
-              Text(status),
+              Expanded(
+                child: Text(
+                  status,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.black87,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         );
@@ -217,33 +360,86 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRecentActivity(List<Job> jobs) {
-    // Sort by date descending
+  Widget _buildRecentActivity(List<Job> jobs, BuildContext context) {
     final recentJobs = List<Job>.from(jobs)
       ..sort((a, b) => b.appliedDate.compareTo(a.appliedDate));
     final displayJobs = recentJobs.take(3).toList();
 
     if (displayJobs.isEmpty) {
-      return const Text("No recent activity.");
+      return Container(
+        padding: const EdgeInsets.all(24),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Text(
+          "No recent activity to show.",
+          style: TextStyle(color: Colors.grey[500]),
+        ),
+      );
     }
 
     return Column(
       children: displayJobs
           .map(
-            (job) => Card(
-              margin: const EdgeInsets.only(bottom: 8),
+            (job) => Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.02),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
               child: ListTile(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => JobDetailsScreen(job: job),
+                    ),
+                  );
+                },
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 8,
+                ),
                 title: Text(
                   job.company,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(job.role),
-                trailing: Chip(
-                  label: Text(
-                    job.status,
-                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
                   ),
-                  backgroundColor: _getStatusColor(job.status),
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    job.role,
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(job.status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    job.status,
+                    style: TextStyle(
+                      color: _getStatusColor(job.status),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -255,17 +451,17 @@ class HomeScreen extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'Applied':
-        return Colors.blue;
+        return const Color(0xFF2196F3); // Material Blue
       case 'Interview':
-        return Colors.orange;
+        return const Color(0xFFFF9800); // Material Orange
       case 'Offer':
-        return Colors.green;
+        return const Color(0xFF4CAF50); // Material Green
       case 'Rejected':
-        return Colors.red;
+        return const Color(0xFFE53935); // Material Red
       case 'No Response':
-        return Colors.grey;
+        return Colors.grey.shade400;
       default:
-        return Colors.purple;
+        return Colors.purple.shade400;
     }
   }
 }

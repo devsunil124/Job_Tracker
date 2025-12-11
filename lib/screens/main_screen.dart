@@ -3,6 +3,7 @@ import 'home_screen.dart';
 import 'wishlist_screen.dart';
 import 'resume_maker_screen.dart';
 
+import 'package:permission_handler/permission_handler.dart';
 import 'package:ota_update/ota_update.dart';
 import '../services/update_service.dart';
 
@@ -116,21 +117,80 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _startUpdate(UpdateService service, String url) {
-    service
-        .update(url)
-        .listen(
-          (OtaEvent event) {
-            if (event.status == OtaStatus.DOWNLOADING) {
-              // Optional: Show progress, maybe update a state to show a progress bar
-              // print("Downloading: ${event.value}%");
-            } else if (event.status == OtaStatus.INSTALLING) {
-              // Installation started
-            }
-          },
-          onError: (e) {
-            print("Update Error: $e");
+  Future<void> _startUpdate(UpdateService service, String url) async {
+    // Request storage permission
+    var status = await Permission.storage.request();
+    if (!status.isGranted) {
+      if (await Permission.storage.isPermanentlyDenied) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Storage permission is required for updates. Please enable it in settings.',
+            ),
+          ),
+        );
+        openAppSettings();
+      }
+      return;
+    }
+
+    // Also request install packages permission (often handled by OS, but good to check)
+    // Note: 'requestInstallPackages' is not a standard runtime permission request in the same way,
+    // usually handled by intent, but managing storage is key for the download.
+
+    if (!mounted) return;
+
+    // Show Progress Dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Updating...'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  LinearProgressIndicator(),
+                  SizedBox(height: 20),
+                  Text("Downloading update..."),
+                ],
+              ),
+            );
           },
         );
+      },
+    );
+
+    try {
+      service
+          .update(url)
+          .listen(
+            (OtaEvent event) {
+              if (event.status == OtaStatus.DOWNLOADING) {
+                // We can update progress here if we want to show %, but indefinite is fine for now
+              } else if (event.status == OtaStatus.INSTALLING) {
+                Navigator.pop(context); // Close dialog
+              }
+            },
+            onError: (e) {
+              Navigator.pop(context); // Close dialog
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text("Update Error: $e")));
+            },
+            onDone: () {
+              // Usually handled by INSTALLING or close
+              // Navigator.pop(context);
+            },
+          );
+    } catch (e) {
+      Navigator.pop(context); // Close dialog
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Error starting update: $e")));
+    }
   }
 }

@@ -136,25 +136,35 @@ class _MainScreenState extends State<MainScreen> {
 
     if (!mounted) return;
 
+    // Progress Notifier
+    ValueNotifier<String> progressNotifier = ValueNotifier("Initializing...");
+    ValueNotifier<double?> percentNotifier = ValueNotifier(null);
+
     // Show Progress Dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Updating...'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: const [
-                  LinearProgressIndicator(),
-                  SizedBox(height: 20),
-                  Text("Downloading update..."),
-                ],
+        return AlertDialog(
+          title: const Text('Updating...'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ValueListenableBuilder<double?>(
+                valueListenable: percentNotifier,
+                builder: (context, percent, child) {
+                  return LinearProgressIndicator(value: percent);
+                },
               ),
-            );
-          },
+              const SizedBox(height: 20),
+              ValueListenableBuilder<String>(
+                valueListenable: progressNotifier,
+                builder: (context, message, child) {
+                  return Text(message);
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -162,17 +172,38 @@ class _MainScreenState extends State<MainScreen> {
     try {
       service
           .update(url)
+          .timeout(
+            const Duration(seconds: 60),
+            onTimeout: (sink) {
+              sink.addError("Connection timed out. Please try again.");
+            },
+          )
           .listen(
             (OtaEvent event) {
-              if (event.status == OtaStatus.INSTALLING) {
-                Navigator.pop(context); // Close progress dialog
+              if (event.status == OtaStatus.DOWNLOADING) {
+                // Update progress
+                final progress = event.value; // string "10", "20" etc
+                if (progress != null) {
+                  try {
+                    int p = int.parse(progress);
+                    percentNotifier.value = p / 100.0;
+                    progressNotifier.value = "Downloading: $p%";
+                  } catch (_) {
+                    progressNotifier.value = "Downloading...";
+                  }
+                }
+              } else if (event.status == OtaStatus.INSTALLING) {
+                progressNotifier.value = "Installing...";
+                percentNotifier.value = null; // Indeterminate
+                Navigator.pop(context); // Close dialog (or keep it open?)
+                // Usually OTA Update plugin handles installation intent, so pop is safe
               } else if (event.status ==
                   OtaStatus.PERMISSION_NOT_GRANTED_ERROR) {
                 Navigator.pop(context);
                 _showErrorDialog("Permission not granted for update.");
               } else if (event.status == OtaStatus.INTERNAL_ERROR) {
                 Navigator.pop(context);
-                _showErrorDialog("Internal error during update.");
+                _showErrorDialog("Internal error (OTA) during update.");
               } else if (event.status == OtaStatus.DOWNLOAD_ERROR) {
                 Navigator.pop(context);
                 _showErrorDialog("Download failed. Check internet connection.");

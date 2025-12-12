@@ -88,26 +88,35 @@ class _JobDetailsScreenState extends State<JobDetailsScreen> {
               ),
               child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.business,
-                      size: 48,
-                      color: AppTheme.primaryColor,
+                  Hero(
+                    tag: 'job-icon-${widget.job.id}',
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.business,
+                        size: 48,
+                        color: AppTheme.primaryColor,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
-                  Text(
-                    widget.job.company,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                  Hero(
+                    tag: 'job-company-${widget.job.id}',
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Text(
+                        widget.job.company,
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(

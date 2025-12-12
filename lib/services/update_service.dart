@@ -57,7 +57,7 @@ class UpdateService {
 
   /// Starts the OTA update
   Stream<OtaEvent> update(String url) {
-    return OtaUpdate().execute(url);
+    return OtaUpdate().execute(url, destinationFilename: 'app-release.apk');
   }
 
   bool _isVersionNewer(String serverVersion, String currentVersion) {

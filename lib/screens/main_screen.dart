@@ -119,25 +119,20 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<void> _startUpdate(UpdateService service, String url) async {
     // Request storage permission
-    var status = await Permission.storage.request();
-    if (!status.isGranted) {
-      if (await Permission.storage.isPermanentlyDenied) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Storage permission is required for updates. Please enable it in settings.',
-            ),
+    if (await Permission.storage.request().isGranted) {
+      // Permission granted
+    } else if (await Permission.storage.isPermanentlyDenied) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Storage permission required. Please enable in settings.',
           ),
-        );
-        openAppSettings();
-      }
+        ),
+      );
+      openAppSettings();
       return;
     }
-
-    // Also request install packages permission (often handled by OS, but good to check)
-    // Note: 'requestInstallPackages' is not a standard runtime permission request in the same way,
-    // usually handled by intent, but managing storage is key for the download.
 
     if (!mounted) return;
 
@@ -169,28 +164,46 @@ class _MainScreenState extends State<MainScreen> {
           .update(url)
           .listen(
             (OtaEvent event) {
-              if (event.status == OtaStatus.DOWNLOADING) {
-                // We can update progress here if we want to show %, but indefinite is fine for now
-              } else if (event.status == OtaStatus.INSTALLING) {
-                Navigator.pop(context); // Close dialog
+              if (event.status == OtaStatus.INSTALLING) {
+                Navigator.pop(context); // Close progress dialog
+              } else if (event.status ==
+                  OtaStatus.PERMISSION_NOT_GRANTED_ERROR) {
+                Navigator.pop(context);
+                _showErrorDialog("Permission not granted for update.");
+              } else if (event.status == OtaStatus.INTERNAL_ERROR) {
+                Navigator.pop(context);
+                _showErrorDialog("Internal error during update.");
+              } else if (event.status == OtaStatus.DOWNLOAD_ERROR) {
+                Navigator.pop(context);
+                _showErrorDialog("Download failed. Check internet connection.");
               }
             },
             onError: (e) {
-              Navigator.pop(context); // Close dialog
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text("Update Error: $e")));
-            },
-            onDone: () {
-              // Usually handled by INSTALLING or close
-              // Navigator.pop(context);
+              if (!mounted) return;
+              Navigator.pop(context); // Close progress dialog
+              _showErrorDialog("Update Error: $e");
             },
           );
     } catch (e) {
-      Navigator.pop(context); // Close dialog
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error starting update: $e")));
+      if (!mounted) return;
+      Navigator.pop(context); // Close progress dialog
+      _showErrorDialog("Error starting update: $e");
     }
+  }
+
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Update Failed'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 }

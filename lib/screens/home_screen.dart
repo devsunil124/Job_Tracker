@@ -2,7 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import 'dart:ui'; // For verifying glassmorphism if needed
+// For verifying glassmorphism if needed
 import '../providers/job_provider.dart';
 import '../models/job.dart';
 import 'add_job_screen.dart';

@@ -2,15 +2,20 @@ import 'package:flutter/foundation.dart';
 import '../models/job.dart';
 import '../services/storage_service.dart';
 import '../services/resume_service.dart';
+import '../models/resume.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class JobProvider with ChangeNotifier {
   final StorageService _storageService = StorageService();
   final ResumeService _resumeService = ResumeService();
 
   List<Job> _jobs = [];
+  List<StoredResume> _resumes = [];
   bool _isLoading = false;
 
   List<Job> get jobs => _jobs;
+  List<StoredResume> get resumes => _resumes;
   bool get isLoading => _isLoading;
 
   // Filtered lists
@@ -35,6 +40,7 @@ class JobProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     _jobs = await _storageService.loadJobs();
+    await _loadResumes();
     _isLoading = false;
     notifyListeners();
   }
@@ -69,5 +75,34 @@ class JobProvider with ChangeNotifier {
 
   Future<void> moveToApplied(String id) async {
     await updateJobStatus(id, 'Applied');
+  }
+
+  // --- Resume Logic ---
+
+  Future<void> _loadResumes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? startData = prefs.getString('resumes');
+    if (startData != null) {
+      final List<dynamic> decoded = json.decode(startData);
+      _resumes = decoded.map((item) => StoredResume.fromMap(item)).toList();
+    }
+  }
+
+  Future<void> addStoredResume(StoredResume resume) async {
+    _resumes.add(resume);
+    await _saveResumes();
+    notifyListeners();
+  }
+
+  Future<void> deleteStoredResume(String id) async {
+    _resumes.removeWhere((r) => r.id == id);
+    await _saveResumes();
+    notifyListeners();
+  }
+
+  Future<void> _saveResumes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String encoded = json.encode(_resumes.map((e) => e.toMap()).toList());
+    await prefs.setString('resumes', encoded);
   }
 }
